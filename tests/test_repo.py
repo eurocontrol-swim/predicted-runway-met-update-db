@@ -380,8 +380,20 @@ def test_get_taf_wind_input(
            == expected_wind_input
 
 
+@mock.patch('met_update_db.repo.get_taf_wind_input')
+@mock.patch('met_update_db.repo.get_metar_wind_input')
+def test_get_wind_input__no_data_available__raises_metnotavailable(
+        mock_get_metar_wind_input,
+        mock_get_taf_wind_input,
+):
+    mock_get_metar_wind_input.return_value = None
+    mock_get_taf_wind_input.return_value = None
+
+    with pytest.raises(repo.METNotAvailable):
+        repo.get_wind_input('EHAM', before_timestamp=get_current_timestamp())
+
+
 @pytest.mark.parametrize('metar_wind_input, taf_wind_input, expected_result', [
-    (None, None, None),
     (
         WindInput(direction=180, speed=10),
         None,
@@ -412,3 +424,37 @@ def test_get_wind_input(
 
     assert repo.get_wind_input('EHAM', before_timestamp=get_current_timestamp()) \
         == expected_result
+
+
+def test_get_last_taf_end_time__no_taf_available__raises_metnotavailable():
+    with pytest.raises(repo.METNotAvailable):
+        repo.get_last_taf_end_time('EHAM')
+
+
+@pytest.mark.parametrize('taf_objects, expected_last_taf_end_time', [
+    (
+        [
+            orm.Taf(
+                id=uuid.uuid4().hex,
+                airport_icao='EHAM',
+                content={'meta': {}},
+                start_time=datetime.datetime(2022, 5, 30, 12),
+                end_time=datetime.datetime(2022, 5, 30, 22),
+                created_at=datetime.datetime(2022, 5, 30, 11)
+            ),
+            orm.Taf(
+                id=uuid.uuid4().hex,
+                airport_icao='EHAM',
+                content={'meta': {}},
+                start_time=datetime.datetime(2022, 6, 30, 12),
+                end_time=datetime.datetime(2022, 6, 30, 22),
+                created_at=datetime.datetime(2022, 6, 30, 11)
+            ),
+        ],
+        datetime.datetime(2022, 6, 30, 22)
+    )
+])
+def test_get_last_taf_end_time(taf_objects, expected_last_taf_end_time):
+    [taf.save() for taf in taf_objects]
+
+    assert repo.get_last_taf_end_time('EHAM') == expected_last_taf_end_time

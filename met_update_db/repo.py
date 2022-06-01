@@ -58,6 +58,10 @@ class WindInput:
     speed: float
 
 
+class METNotAvailable(Exception):
+    ...
+
+
 def add_taf(taf_data: dict, airport_icao: str):
     taf = Taf(
         id=uuid.uuid4().hex,
@@ -183,8 +187,7 @@ def get_taf_wind_input(airport_icao: str, before_timestamp: int) -> WindInput | 
             return WindInput(direction=wind_direction, speed=wind_speed)
 
 
-def get_wind_input(airport_icao: str, before_timestamp: int) \
-        -> tuple[WindInput, WindInputSource] | None:
+def get_wind_input(airport_icao: str, before_timestamp: int) -> tuple[WindInput, WindInputSource]:
 
     wind_input = get_metar_wind_input(airport_icao, before_timestamp)
     if wind_input is not None:
@@ -193,3 +196,14 @@ def get_wind_input(airport_icao: str, before_timestamp: int) \
     wind_input = get_taf_wind_input(airport_icao, before_timestamp)
     if wind_input is not None:
         return wind_input, WindInputSource.TAF
+
+    raise METNotAvailable()
+
+
+def get_last_taf_end_time(airport_icao: str) -> datetime.datetime | None:
+    taf = Taf.objects(airport_icao=airport_icao).order_by('-created_at').all()
+
+    if not taf:
+        raise METNotAvailable()
+
+    return taf[0].end_time
