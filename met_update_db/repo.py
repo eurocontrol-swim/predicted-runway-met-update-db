@@ -47,13 +47,13 @@ from met_update_db.utils import datetime_from_timestamp, datetime_from_string, \
     datetime_from_string_with_ms
 
 
-class WindInputSource(Enum):
+class WindDataSource(Enum):
     METAR = 'METAR'
     TAF = 'TAF'
 
 
 @dataclass
-class WindInput:
+class WindData:
     direction: float
     speed: float
 
@@ -127,7 +127,7 @@ def _get_wind_value(content: dict, value_key: str) -> float | None:
     return result
 
 
-def get_metar_wind_input(airport_icao: str, before_timestamp: int) -> WindInput | None:
+def get_metar_wind_data(airport_icao: str, before_timestamp: int) -> WindData | None:
 
     metar = get_metar(airport_icao, before_timestamp)
 
@@ -140,7 +140,7 @@ def get_metar_wind_input(airport_icao: str, before_timestamp: int) -> WindInput 
         wind_speed = _get_wind_value(content=metar.content, value_key='wind_speed')
 
         if wind_speed is not None:
-            return WindInput(direction=wind_direction, speed=wind_speed)
+            return WindData(direction=wind_direction, speed=wind_speed)
 
 
 def _get_taf_wind_value(taf_content: dict, before_timestamp: int, value_key: str) -> float | None:
@@ -171,7 +171,7 @@ def _get_taf_wind_speed(taf: Taf, before_timestamp: int) -> float | None:
     return _get_taf_wind_value(taf.content, before_timestamp, value_key='wind_speed')
 
 
-def get_taf_wind_input(airport_icao: str, before_timestamp: int) -> WindInput | None:
+def get_taf_wind_data(airport_icao: str, before_timestamp: int) -> WindData | None:
 
     taf = get_taf(airport_icao, before_timestamp)
 
@@ -184,18 +184,18 @@ def get_taf_wind_input(airport_icao: str, before_timestamp: int) -> WindInput | 
         wind_speed = _get_taf_wind_speed(taf, before_timestamp)
 
         if wind_speed is not None:
-            return WindInput(direction=wind_direction, speed=wind_speed)
+            return WindData(direction=wind_direction, speed=wind_speed)
 
 
-def get_wind_input(airport_icao: str, before_timestamp: int) -> tuple[WindInput, WindInputSource]:
+def get_wind_data(airport_icao: str, before_timestamp: int) -> tuple[WindData, WindDataSource]:
 
-    wind_input = get_metar_wind_input(airport_icao, before_timestamp)
-    if wind_input is not None:
-        return wind_input, WindInputSource.METAR
+    wind_data = get_metar_wind_data(airport_icao, before_timestamp)
+    if wind_data is not None:
+        return wind_data, WindDataSource.METAR
 
-    wind_input = get_taf_wind_input(airport_icao, before_timestamp)
-    if wind_input is not None:
-        return wind_input, WindInputSource.TAF
+    wind_data = get_taf_wind_data(airport_icao, before_timestamp)
+    if wind_data is not None:
+        return wind_data, WindDataSource.TAF
 
     raise METNotAvailable()
 

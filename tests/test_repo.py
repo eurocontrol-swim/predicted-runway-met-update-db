@@ -42,7 +42,7 @@ from unittest import mock
 import pytest
 
 from met_update_db import repo, orm
-from met_update_db.repo import WindInputSource, WindInput
+from met_update_db.repo import WindDataSource, WindData
 from met_update_db.utils import datetime_from_string, datetime_from_string_with_ms
 
 
@@ -233,11 +233,11 @@ def test_taf_get_wind_value(content, value_key, expected_value):
     assert repo._get_wind_value(content, value_key) == expected_value
 
 
-def test_get_metar_wind_input__no_metar_found__returns_none():
-    assert repo.get_metar_wind_input('EHAM', before_timestamp=get_current_timestamp()) is None
+def test_get_metar_wind_data__no_metar_found__returns_none():
+    assert repo.get_metar_wind_data('EHAM', before_timestamp=get_current_timestamp()) is None
 
 
-@pytest.mark.parametrize('retrieved_metar, expected_wind_input', [
+@pytest.mark.parametrize('retrieved_metar, expected_wind_data', [
     (None, None),
     (
         orm.Metar(
@@ -274,29 +274,29 @@ def test_get_metar_wind_input__no_metar_found__returns_none():
         None
     ),
     (
-        orm.Metar(
-            id=uuid.uuid4().hex,
-            airport_icao='EHAM',
-            content={
-                'wind_direction': {
-                    'value': 180
+            orm.Metar(
+                id=uuid.uuid4().hex,
+                airport_icao='EHAM',
+                content={
+                    'wind_direction': {
+                        'value': 180
+                    },
+                    'wind_speed': {
+                        'value': 10,
+                    }
                 },
-                'wind_speed': {
-                    'value': 10,
-                }
-            },
-            time=datetime.datetime(2022, 5, 30, 12),
-            created_at=datetime.datetime(2022, 5, 30, 11)
-        ),
-        WindInput(direction=180, speed=10)
+                time=datetime.datetime(2022, 5, 30, 12),
+                created_at=datetime.datetime(2022, 5, 30, 11)
+            ),
+            WindData(direction=180, speed=10)
     )
 ])
 @mock.patch('met_update_db.repo.get_metar')
-def test_get_metar_wind_input(mock_get_metar, retrieved_metar, expected_wind_input):
+def test_get_metar_wind_data(mock_get_metar, retrieved_metar, expected_wind_data):
     mock_get_metar.return_value = retrieved_metar
 
-    assert repo.get_metar_wind_input('EHAM', before_timestamp=get_current_timestamp()) \
-           == expected_wind_input
+    assert repo.get_metar_wind_data('EHAM', before_timestamp=get_current_timestamp()) \
+           == expected_wind_data
 
 
 @pytest.mark.parametrize('taf_content, before_timestamp, expected_backup_value', [
@@ -349,80 +349,80 @@ def test_get_taf_wind_value__return_the_backup_value_in_case_none_is_found(
 
 
 @mock.patch('met_update_db.repo.get_taf')
-def test_get_taf_wind_input__no_metar_is_found__returns_none(mock_get_taf):
+def test_get_taf_wind_data__no_metar_is_found__returns_none(mock_get_taf):
     mock_get_taf.return_value = None
 
-    assert repo.get_taf_wind_input('EHAM', before_timestamp=get_current_timestamp()) is None
+    assert repo.get_taf_wind_data('EHAM', before_timestamp=get_current_timestamp()) is None
 
 
-@pytest.mark.parametrize('wind_direction, wind_speed, expected_wind_input', [
+@pytest.mark.parametrize('wind_direction, wind_speed, expected_wind_data', [
     (None, None, None),
     (None, 10, None),
     (180, None, None),
-    (180, 10, WindInput(direction=180, speed=10)),
+    (180, 10, WindData(direction=180, speed=10)),
 ])
 @mock.patch('met_update_db.repo.get_taf')
 @mock.patch('met_update_db.repo._get_taf_wind_speed')
 @mock.patch('met_update_db.repo._get_taf_wind_direction')
-def test_get_taf_wind_input(
+def test_get_taf_wind_data(
         mock_get_taf_wind_direction,
         mock_get_taf_wind_speed,
         mock_get_taf,
         wind_direction,
         wind_speed,
-        expected_wind_input
+        expected_wind_data
 ):
     mock_get_taf_wind_direction.return_value = wind_direction
     mock_get_taf_wind_speed.return_value = wind_speed
     mock_get_taf.return_value = mock.Mock()
 
-    assert repo.get_taf_wind_input('EHAM', before_timestamp=get_current_timestamp()) \
-           == expected_wind_input
+    assert repo.get_taf_wind_data('EHAM', before_timestamp=get_current_timestamp()) \
+           == expected_wind_data
 
 
-@mock.patch('met_update_db.repo.get_taf_wind_input')
-@mock.patch('met_update_db.repo.get_metar_wind_input')
-def test_get_wind_input__no_data_available__raises_metnotavailable(
-        mock_get_metar_wind_input,
-        mock_get_taf_wind_input,
+@mock.patch('met_update_db.repo.get_taf_wind_data')
+@mock.patch('met_update_db.repo.get_metar_wind_data')
+def test_get_wind_data__no_data_available__raises_metnotavailable(
+        mock_get_metar_wind_data,
+        mock_get_taf_wind_data,
 ):
-    mock_get_metar_wind_input.return_value = None
-    mock_get_taf_wind_input.return_value = None
+    mock_get_metar_wind_data.return_value = None
+    mock_get_taf_wind_data.return_value = None
 
     with pytest.raises(repo.METNotAvailable):
-        repo.get_wind_input('EHAM', before_timestamp=get_current_timestamp())
+        repo.get_wind_data('EHAM', before_timestamp=get_current_timestamp())
 
 
-@pytest.mark.parametrize('metar_wind_input, taf_wind_input, expected_result', [
+@pytest.mark.parametrize('metar_wind_data, taf_wind_data, expected_result', [
     (
-        WindInput(direction=180, speed=10),
-        None,
-        (WindInput(direction=180, speed=10), WindInputSource.METAR)
+            WindData(direction=180, speed=10),
+            None,
+            (WindData(direction=180, speed=10), WindDataSource.METAR)
      ),
     (
-        WindInput(direction=180, speed=10),
-        WindInput(direction=100, speed=8),
-        (WindInput(direction=180, speed=10), WindInputSource.METAR)
+            WindData(direction=180, speed=10),
+            WindData(direction=100, speed=8),
+            (WindData(direction=180, speed=10), WindDataSource.METAR)
     ),
     (
-        None,
-        WindInput(direction=180, speed=10),
-        (WindInput(direction=180, speed=10), WindInputSource.TAF)
+            None,
+            WindData(direction=180, speed=10),
+            (WindData(direction=180, speed=10), WindDataSource.TAF)
     ),
 ])
-@mock.patch('met_update_db.repo.get_taf_wind_input')
-@mock.patch('met_update_db.repo.get_metar_wind_input')
-def test_get_wind_input(
-        mock_get_metar_wind_input,
-        mock_get_taf_wind_input,
-        metar_wind_input,
-        taf_wind_input,
+@mock.patch('met_update_db.repo.get_taf_wind_data')
+@mock.patch('met_update_db.repo.get_metar_wind_data')
+def test_get_wind_data(
+        mock_get_metar_wind_data,
+        mock_get_taf_wind_data,
+        metar_wind_data,
+        taf_wind_data,
         expected_result
 ):
-    mock_get_metar_wind_input.return_value = metar_wind_input
-    mock_get_taf_wind_input.return_value = taf_wind_input
+    mock_get_metar_wind_data.return_value = metar_wind_data
+    mock_get_taf_wind_data.return_value = taf_wind_data
 
-    assert repo.get_wind_input('EHAM', before_timestamp=get_current_timestamp()) \
+    assert repo.get_wind_data('EHAM', before_timestamp=get_current_timestamp()) \
         == expected_result
 
 
